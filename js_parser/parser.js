@@ -1,7 +1,10 @@
 Tokenizer = require('./tokenizer.js')
 Hash = require("./hash.js");
 
-
+var tokens = {
+  start : /start/,
+  finish : /finish/
+}
 
 function Parser(str) {
 
@@ -18,13 +21,18 @@ function Parser(str) {
       .add(/%/)
       .add(/\(/)
       .add(/\)/)
-      .add(/(\s+)/)
+      .add(/(\s)/)
+      //.add(/(\r\n|\r|\n)/)
+      .add(/"(.*?)"/) //grabs quoted string
+      .add(/\[/)
+      .add(/\]/)
       .add(/start/)
       .add(/end/)
       .add(/finish/)
       .add(/var/)
-      .add(/[A-Za-z]+/)
+      .add(/[A-Za-z]+/) //grabs unquoted string and characters
       .add(/=/)
+      .add(/,/)
       .add(/;/)
       .add(/print/);
 
@@ -38,7 +46,30 @@ function Parser(str) {
 Parser.prototype.factor = function() {
   var result;
 
-  if(this.tokenizer.current().match(/\d+(\.\d+)?/)) {
+  //accept(ident)
+  if(this.varHash.keyExists(this.tokenizer.current())) {
+    var key = this.tokenizer.current();
+    this.accept(/[A-Za-z]+/);
+    //if ident is an array
+    //console.log(this.varHash.get(key));
+    if(this.accept(/\[/)) {
+      var array = this.varHash.get(key);
+      result = parseFloat(array[this.tokenizer.current()]);
+      this.tokenizer.eat();
+      this.expect(/\]/);
+    }
+    //else ident is number or string
+    else {
+      var value = this.varHash.get(key);
+      //console.log("value: " + value);
+      if (value.match(/\"(.*?)\"/))
+        result = this.varHash.get(key).replace(/\\\"/g, "");
+      else
+        result = parseFloat(this.varHash.get(key));
+    }
+    //console.log("result factor " + result);
+  }
+  else if(this.tokenizer.current().match(/\d+(\.\d+)?/)) {
     result = this.tokenizer.float_val();
     //console.log("result factor " + result);
     this.tokenizer.eat();
@@ -121,91 +152,153 @@ Parser.prototype.term = function() {
 
 Parser.prototype.expr = function() {
   var sign = 1;
-  var result;
+  var result, term;
 
   //console.log(this.tokenizer.current());
-  if (this.tokenizer.current().match(/^-$/)) {
+  if(this.accept(/"(.*?)"/)) {
+    return this.tokenizer.previous_token;
+  }
+  if (this.accept(/^-$/)) {
     //console.log("match - " + this.tokenizer.current());
-    this.tokenizer.eat();
     sign = -1;
   }
-  else if (this.tokenizer.current().match(/^\+$/)) {
-    this.tokenizer.eat();
+  else if (this.accept(/^\+$/)) {
     sign = 1;
   }
-  result = this.term() * sign;
-//console.log("term result = " + result);
-  while(this.tokenizer.current().match(/^\+$/) || this.tokenizer.current().match(/^-$/)) {
-    if(this.tokenizer.current().match(/^\+$/)) {
-      this.tokenizer.eat();
-      //console.log(this.tokenizer.current());
-      result += this.term();
-    }
-    else if(this.tokenizer.current().match(/^-$/)) {
-      this.tokenizer.eat();
-      //console.log(this.tokenizer.current());
-      if(this.tokenizer.current().match(/^-$/)) {
+  if(typeof((term = this.term())) === 'number') {
+    result = term * sign;
+  }
+  else {
+    result = term;
+  }
+  //console.log("term result = " + result);
+    while(this.tokenizer.current().match(/^\+$/) || this.tokenizer.current().match(/^-$/)) {
+      if(this.tokenizer.current().match(/^\+$/)) {
         this.tokenizer.eat();
+        //console.log(this.tokenizer.current());
         result += this.term();
       }
+      else if(this.tokenizer.current().match(/^-$/)) {
+        this.tokenizer.eat();
+        //console.log(this.tokenizer.current());
+        if(this.tokenizer.current().match(/^-$/)) {
+          this.tokenizer.eat();
+          result += this.term();
+        }
+        else {
+          result -= this.term();
+        }
+      }
       else {
-        result -= this.term();
+        var str = "expression: syntax error '" + this.tokenizer.current() + "' unexpected";
+        throw new ParserException(str.toString(),this.tokenizer.tok_pos);
       }
     }
-    else {
-      var str = "expression: syntax error '" + this.tokenizer.current() + "' unexpected";
-      throw new ParserException(str.toString(),this.tokenizer.tok_pos);
-    }
-  }
+  //console.log("term result = " + result);
   return result;
 }
 
 Parser.prototype.statement = function() {
   var key;
   var printStr;
-  if( this.tokenizer.current().match(/start/)) {
-    this.tokenizer.eat();
-    while (!this.tokenizer.current().match(/finish/)) {
-      if (this.tokenizer.current().match(/var/)) {
-        this.tokenizer.eat();
-        //expect identifier string
-        if(this.tokenizer.current().match(/[A-Za-z]+/)) {
-          key = this.tokenizer.current_token;
-          console.log(key);
-          this.tokenizer.eat();
-          if(this.tokenizer.current().match(/=/)) {
-            this.tokenizer.eat();
-            var result = this.expr();
-            //console.log(result);
-            this.varHash.set(key, result);
-          }
-          else {
-            var str = "expression: syntax error '" + this.tokenizer.current() + "' unexpected";
-            throw new ParserException(str.toString(),this.tokenizer.tok_pos);
-          }
-        }
-        else {
-          var str = "expression: syntax error '" + this.tokenizer.current() + "' unexpected";
-          throw new ParserException(str.toString(),this.tokenizer.tok_pos);
-        }
+  console.log("statement...");
+  console.log(this.tokenizer.current());
+
+  if (this.accept(/print/)) {
+    //console.log(this.tokenizer.tok_pos);
+    this.print(this.expr());
+    // if(this.accept(/\(/)) {
+    //   do {
+    //     //console.log("current token : " + this.tokenizer.tok_pos);
+    //     if (this.accept(/"(.*?)"/)) {
+    //       var key = this.tokenizer.previous_token;
+    //       //console.log(key);
+    //       this.print(this.tokenizer.previous_token);
+    //     }
+    //     else if(this.varHash.keyExists(this.tokenizer.current())) {
+    //       this.accept(/[A-Za-z]+/);
+    //       var key = this.tokenizer.previous_token;
+    //       //console.log(key);
+    //       if(this.accept(/\[/)) {
+    //         var array = this.varHash.get(key);
+    //         this.print(array[this.tokenizer.current()]);
+    //         this.tokenizer.eat();
+    //         this.expect(/\]/);
+    //       }
+    //       else {
+    //         this.print(this.varHash.get(key));
+    //       }
+    //     }
+    //   } while(!this.accept(/\)/));
+      this.expect(/;/);
+    //}
+  }
+  //if ident
+  else if(this.varHash.keyExists(this.tokenizer.current())) {
+    this.accept(/[A-Za-z]+/);
+    key = this.tokenizer.previous_token;
+    if(this.accept(/=/)) {
+      if(this.accept(/\[/)) {
+        var array = [];
+        do {
+          array.push(this.expr());
+        } while(this.accept(/,/));
+        this.expect(/\]/);
+        var result = array;
       }
-      if (this.tokenizer.current().match(/print/)) {
-        this.tokenizer.eat();
-        if(this.tokenizer.current().match(/\(/)) {
-          this.tokenizer.eat();
-          while(!this.tokenizer.current().match(/\)/)) {
-            //console.log("current tok : " + this.tokenizer.current());
-            var key = this.tokenizer.current_token;
-            //console.log(key);
-            this.print("result " + this.varHash.get(key));
-            this.tokenizer.eat();
-          }
-        }
+      else {
+        var result = this.expr();
       }
-      this.tokenizer.eat();
-      //console.log(this.varHash.get());
+      console.log(key + " = " + result);
+      this.varHash.set(key, result);
+      this.expect(/;/);
     }
   }
+  //console.log(this.varHash.get());
+}
+
+Parser.prototype.block = function() {
+  if (this.accept(/var/)) {
+    //console.log("var accepted");
+    do {
+      this.expect(/[A-Za-z]+/);
+      key = this.tokenizer.previous_token;
+      console.log("ident = " + key);
+      this.varHash.set(key,0);
+    } while (this.accept(/,/));
+    this.expect(/;/);
+  }
+  this.statement();
+}
+
+
+Parser.prototype.program = function() {
+  var program;
+  if (this.accept(/start/)) {
+    console.log("start program...");
+    do {
+      program = this.block();
+    } while (!this.accept(/finish/));
+    console.log("finished!");
+    return program;
+  }
+}
+
+Parser.prototype.accept = function(regstr) {
+  if(this.tokenizer.current().match(regstr)) {
+    this.tokenizer.eat();
+    return true;
+  }
+  return false;
+}
+
+Parser.prototype.expect = function(regstr) {
+  if(this.accept(regstr)) {
+    return true;
+  }
+  var str = "expect: " + regstr + " unexpected: " + this.tokenizer.current();
+  throw new ParserException(str.toString(),this.tokenizer.tok_pos);
+  return false;
 }
 
 Parser.prototype.print = function(message) {
@@ -215,7 +308,7 @@ Parser.prototype.print = function(message) {
 Parser.prototype.parse = function() {
   console.log(this.tokenizer.tokens);
 
-  return this.statement();
+  return this.program();
 }
 
 function ParserException(message, position) {

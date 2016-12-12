@@ -4,6 +4,7 @@ function Tokenizer(regexps) {
   this.re;
   this.tokens = [];
   this.current_token;
+  this.previous_token;
   this.tok_pos = 0;
 
   if ( regexps ) {
@@ -45,8 +46,8 @@ Tokenizer.prototype.float_val = function() {
 }
 
 Tokenizer.prototype.eat_whitespace = function() {
-  while ( this.tok_pos < this.tokens.length && (this.tokens[this.tok_pos]).match(/(\s+)/) ) {
-//    console.log("ws");
+  while ( this.tok_pos < this.tokens.length && (this.tokens[this.tok_pos]).match(/(\s)/) && (!(this.tokens[this.tok_pos]).match(/"(.*?)"/))) {
+    //console.log("ws " + this.tok_pos);
     this.tok_pos++;
   }
 }
@@ -70,6 +71,7 @@ Tokenizer.prototype.next = function() {
 Tokenizer.prototype.eat = function() {
 
   if ( !this.eof() ) {
+    this.previous_token = this.current_token;
     this.current_token = this.next();
   }
   return this.current_token;
