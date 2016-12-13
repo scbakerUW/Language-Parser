@@ -26,7 +26,8 @@ function Hash(obj) {
       //console.log("get(key,host)" + key + ":" + host);
       if(this.keyExists(key)) {
         //cloneHash = new Hash();
-        return JSON.stringify(this.items[key]);
+        return this.items[key];
+        //return JSON.stringify(this.items[key]);
         //console.log(cloneHash);
       }
       else {

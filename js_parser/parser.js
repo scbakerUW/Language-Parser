@@ -23,7 +23,7 @@ function Parser(str) {
       .add(/\)/)
       .add(/(\s)/)
       //.add(/(\r\n|\r|\n)/)
-      .add(/"(.*?)"/) //grabs quoted string
+      .add(/\"(.*?)\"/) //grabs quoted string
       .add(/\[/)
       .add(/\]/)
       .add(/start/)
@@ -47,6 +47,7 @@ Parser.prototype.factor = function() {
   var result;
 
   //accept(ident)
+  //console.log("current: " + this.tokenizer.current());
   if(this.varHash.keyExists(this.tokenizer.current())) {
     var key = this.tokenizer.current();
     this.accept(/[A-Za-z]+/);
@@ -54,26 +55,45 @@ Parser.prototype.factor = function() {
     //console.log(this.varHash.get(key));
     if(this.accept(/\[/)) {
       var array = this.varHash.get(key);
-      result = parseFloat(array[this.tokenizer.current()]);
+      //console.log(this.tokenizer.current());
+      result = array[this.tokenizer.current()];
       this.tokenizer.eat();
       this.expect(/\]/);
+    }
+    //else if ident is a hash
+    else if(this.accept(/\{/)) {
+      this.expect(/\}/);
     }
     //else ident is number or string
     else {
       var value = this.varHash.get(key);
-      //console.log("value: " + value);
-      if (value.match(/\"(.*?)\"/))
-        result = this.varHash.get(key).replace(/\\\"/g, "");
-      else
-        result = parseFloat(this.varHash.get(key));
+      //console.log("value: " + typeof value);
+      if (typeof(value) === 'number') {
+        result = parseFloat(value);
+      }
+      else if (Array.isArray(value)){
+        result = value;
+      }
+      else if (typeof(value) === 'string'){
+        result = value.replace(/\"/g, "");
+      }
+      // if (value.match(/\"(.*?)\"/))
+      //   result = this.varHash.get(key).replace(/\"/g, "");
+      // else
+      //   result = parseFloat(this.varHash.get(key));
     }
     //console.log("result factor " + result);
   }
+  //accept string
+  else if (this.accept(/\"(.*?)\"/)) {
+    result = this.tokenizer.previous_token.replace(/\"/g, "");
+  }
+  //accept number
   else if(this.tokenizer.current().match(/\d+(\.\d+)?/)) {
     result = this.tokenizer.float_val();
-    //console.log("result factor " + result);
     this.tokenizer.eat();
   }
+  //accept (
   else if (this.tokenizer.current().match(/^\($/)) {
     this.last_pos = this.tokenizer.tok_pos;
     this.paren_count++;
@@ -86,7 +106,7 @@ Parser.prototype.factor = function() {
         throw new ParserException(str.toString(),this.tokenizer.tok_pos);
       }
       else {
-//        console.log("I'm going in...");
+        //console.log("I'm going in...");
         result = this.expr();
 //        console.log("last_pos=" + this.last_pos + ":tok_pos=" + this.tokenizer.tok_pos);
         if(this.last_pos == this.tokenizer.tok_pos && this.paren_count != 0) {
@@ -116,7 +136,7 @@ Parser.prototype.factor = function() {
 Parser.prototype.term = function() {
   var result;
   result = this.factor();
-//  console.log("factor result = " + result);
+  //console.log("factor result = " + result);
   while(this.tokenizer.current().match(/^\*$/) || this.tokenizer.current().match(/^\/$/) ||
         this.tokenizer.current().match(/^\%$/)) {
     if(this.tokenizer.current().match(/^\*$/)) {
@@ -155,9 +175,9 @@ Parser.prototype.expr = function() {
   var result, term;
 
   //console.log(this.tokenizer.current());
-  if(this.accept(/"(.*?)"/)) {
-    return this.tokenizer.previous_token;
-  }
+  // if(this.accept(/\"(.*?)\"/)) {
+  //   return this.tokenizer.previous_token.replace(/\"/g,"");
+  // }
   if (this.accept(/^-$/)) {
     //console.log("match - " + this.tokenizer.current());
     sign = -1;
@@ -176,7 +196,9 @@ Parser.prototype.expr = function() {
       if(this.tokenizer.current().match(/^\+$/)) {
         this.tokenizer.eat();
         //console.log(this.tokenizer.current());
-        result += this.term();
+        term = this.term();
+        //console.log("typeof term: " + typeof(term));
+        result += term;
       }
       else if(this.tokenizer.current().match(/^-$/)) {
         this.tokenizer.eat();
@@ -201,37 +223,13 @@ Parser.prototype.expr = function() {
 Parser.prototype.statement = function() {
   var key;
   var printStr;
-  console.log("statement...");
-  console.log(this.tokenizer.current());
+  //console.log("statement...");
+  //console.log(this.tokenizer.current());
 
   if (this.accept(/print/)) {
     //console.log(this.tokenizer.tok_pos);
     this.print(this.expr());
-    // if(this.accept(/\(/)) {
-    //   do {
-    //     //console.log("current token : " + this.tokenizer.tok_pos);
-    //     if (this.accept(/"(.*?)"/)) {
-    //       var key = this.tokenizer.previous_token;
-    //       //console.log(key);
-    //       this.print(this.tokenizer.previous_token);
-    //     }
-    //     else if(this.varHash.keyExists(this.tokenizer.current())) {
-    //       this.accept(/[A-Za-z]+/);
-    //       var key = this.tokenizer.previous_token;
-    //       //console.log(key);
-    //       if(this.accept(/\[/)) {
-    //         var array = this.varHash.get(key);
-    //         this.print(array[this.tokenizer.current()]);
-    //         this.tokenizer.eat();
-    //         this.expect(/\]/);
-    //       }
-    //       else {
-    //         this.print(this.varHash.get(key));
-    //       }
-    //     }
-    //   } while(!this.accept(/\)/));
-      this.expect(/;/);
-    //}
+    this.expect(/;/);
   }
   //if ident
   else if(this.varHash.keyExists(this.tokenizer.current())) {
@@ -242,6 +240,7 @@ Parser.prototype.statement = function() {
         var array = [];
         do {
           array.push(this.expr());
+          //console.log(array);
         } while(this.accept(/,/));
         this.expect(/\]/);
         var result = array;
@@ -249,7 +248,7 @@ Parser.prototype.statement = function() {
       else {
         var result = this.expr();
       }
-      console.log(key + " = " + result);
+      //console.log(key + " = " + result);
       this.varHash.set(key, result);
       this.expect(/;/);
     }
@@ -263,7 +262,7 @@ Parser.prototype.block = function() {
     do {
       this.expect(/[A-Za-z]+/);
       key = this.tokenizer.previous_token;
-      console.log("ident = " + key);
+      //console.log("ident = " + key);
       this.varHash.set(key,0);
     } while (this.accept(/,/));
     this.expect(/;/);
