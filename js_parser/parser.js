@@ -1,10 +1,11 @@
 Tokenizer = require('./tokenizer.js')
 Hash = require("./hash.js");
 
-var tokens = {
+var token_type = {
   start : /start/,
-  finish : /finish/
-}
+  finish : /finish/,
+  number : /\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/
+};
 
 function Parser(str) {
 
@@ -26,6 +27,9 @@ function Parser(str) {
       .add(/\"(.*?)\"/) //grabs quoted string
       .add(/\[/)
       .add(/\]/)
+      .add(/\{/)
+      .add(/\}/)
+      .add(/\:/)
       .add(/start/)
       .add(/end/)
       .add(/finish/)
@@ -103,7 +107,7 @@ Parser.prototype.factor = function() {
 //      console.log("P");
       if(this.tokenizer.eof()) {
         var str = "factor: syntax error missing closing ')'";
-        throw new ParserException(str.toString(),this.tokenizer.tok_pos);
+        throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
       }
       else {
         //console.log("I'm going in...");
@@ -111,7 +115,7 @@ Parser.prototype.factor = function() {
 //        console.log("last_pos=" + this.last_pos + ":tok_pos=" + this.tokenizer.tok_pos);
         if(this.last_pos == this.tokenizer.tok_pos && this.paren_count != 0) {
           var str = "factor: syntax error missing closing ')'";
-          throw new ParserException(str.toString(),this.tokenizer.tok_pos);
+          throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
         }
         if(this.last_pos != this.tokenizer.tok_pos) {
           this.paren_count--;
@@ -128,7 +132,7 @@ Parser.prototype.factor = function() {
   }
   else {
     var str = "factor: syntax error '" + this.tokenizer.current_token + "' unexpected";
-    throw new ParserException(str.toString(),this.tokenizer.tok_pos);
+    throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
   }
   return result;
 }
@@ -154,7 +158,7 @@ Parser.prototype.term = function() {
       }
       else {
         var str = "term: divisor error cannot divide by zero";
-        throw new ParserException(str.toString(),this.tokenizer.tok_pos);
+        throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
       }
     }
     else if(this.tokenizer.current().match(/^\%$/)) {
@@ -164,7 +168,7 @@ Parser.prototype.term = function() {
     }
     else {
       var str = "term: syntax error '" + this.tokenizer.current_token + "' unexpected";
-      throw new ParserException(str.toString(),this.tokenizer.tok_pos);
+      throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
     }
   }
   return result;
@@ -213,7 +217,7 @@ Parser.prototype.expr = function() {
       }
       else {
         var str = "expression: syntax error '" + this.tokenizer.current() + "' unexpected";
-        throw new ParserException(str.toString(),this.tokenizer.tok_pos);
+        throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
       }
     }
   //console.log("term result = " + result);
@@ -245,6 +249,13 @@ Parser.prototype.statement = function() {
         this.expect(/\]/);
         var result = array;
       }
+      else if(this.accept(/\{/)) {
+        var newkey = this.expr();
+        this.expect(/\:/);
+        var value = this.expr();
+        var newHash = {newkey:value};
+        this.varHash.set(key,newHash);
+      }
       else {
         var result = this.expr();
       }
@@ -273,11 +284,11 @@ Parser.prototype.block = function() {
 
 Parser.prototype.program = function() {
   var program;
-  if (this.accept(/start/)) {
+  if (this.accept(token_type.start)) {
     console.log("start program...");
     do {
       program = this.block();
-    } while (!this.accept(/finish/));
+    } while (!this.accept(token_type.finish));
     console.log("finished!");
     return program;
   }
@@ -296,7 +307,7 @@ Parser.prototype.expect = function(regstr) {
     return true;
   }
   var str = "expect: " + regstr + " unexpected: " + this.tokenizer.current();
-  throw new ParserException(str.toString(),this.tokenizer.tok_pos);
+  throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
   return false;
 }
 
@@ -310,9 +321,8 @@ Parser.prototype.parse = function() {
   return this.program();
 }
 
-function ParserException(message, position) {
-  this.position = position;
-  this.message = '\x1b[1;31m' + message + ' at character position: ' + position + '\x1b[0;39m';
+function ParserException(message, line_number, char_position) {
+  this.message = '\x1b[1;31m' + message + ' at line number: ' + line_number + '\x1b[0;39m';// + ' character position: ' + char_position + '\x1b[0;39m';
   this.name = "ParserException";
 }
 

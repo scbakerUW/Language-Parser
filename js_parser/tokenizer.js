@@ -6,6 +6,8 @@ function Tokenizer(regexps) {
   this.current_token;
   this.previous_token;
   this.tok_pos = 0;
+  this.line_number = 1;
+  this.char_pos = 0;
 
   if ( regexps ) {
     for ( var i=0; i<regexps.length; i++ ) {
@@ -48,6 +50,11 @@ Tokenizer.prototype.float_val = function() {
 Tokenizer.prototype.eat_whitespace = function() {
   while ( this.tok_pos < this.tokens.length && (this.tokens[this.tok_pos]).match(/(\s)/) && (!(this.tokens[this.tok_pos]).match(/"(.*?)"/))) {
     //console.log("ws " + this.tok_pos);
+    if(this.tokens[this.tok_pos].match(/(\n)/)) {
+      this.line_number++;
+      this.char_pos = 0;
+    }
+    this.char_pos++;
     this.tok_pos++;
   }
 }
