@@ -1,29 +1,29 @@
 start
+  var x, y, z;
+  var str;
+  x = 1 + 4;
+  y = [5,6,7,8];
 
-print("START");
+  print("START");
 
-var x, y, z;
-var str;
-x = 1 + 4;
-y = [5,6,7,8];
-z.firstName = "Ernest";
-z.lastName = "Hemmingway";
+  z.firstName = "Ernest";
+  z.lastName = "Hemmingway";
 
-str = "foo";
+  str = "foo";
 
-print(x);
-print(str + "bar");
-print("Hello World");
-print("x");
-print("y[0] = " + y[0]);
-print(y[1]);
-print(y[2]);
-print(y[3]);
-print(y);
-print("Number " + x);
-print(z.lastName + ", " + z.firstName);
-print(z);
-print(0.5*(-1+2/3.0));
+  print(x);
+  print(str + "bar");
+  print("Hello World");
+  print("x");
+  print("y[0] = " + y[0]);
+  print(y[1]);
+  print(y[2]);
+  print(y[3]);
+  print(y);
+  print("Number " + x);
+  print(z.lastName + ", " + z.firstName);
+  print(z);
+  print(0.5*(-1+2/3.0));
 
-print("FINISH");
+  print("FINISH");
 finish

@@ -30,6 +30,7 @@ var TOKEN_TYPES = {
   ENDSYM : (/end/),
   DO : (/do/),
   WHILE : (/while/),
+  FUNC : (/func/),
 };
 
 function Parser(str) {
@@ -264,6 +265,10 @@ Parser.prototype.expr = function() {
   return result;
 }
 
+Parser.prototype.condition = function() {
+
+}
+
 Parser.prototype.statement = function() {
   var key;
   var printStr;
@@ -326,6 +331,9 @@ Parser.prototype.block = function() {
       this.varHash.set(key,0);
     } while (this.accept(TOKEN_TYPES.COMMA));
     this.expect(TOKEN_TYPES.SEMICOLON);
+    //accept function constructor
+  } else if (this.accept(TOKEN_TYPES.FUNC)) {
+    
   }
   this.statement();
 }
