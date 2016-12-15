@@ -22,12 +22,19 @@ var TOKEN_TYPES = {
   PERIOD : (/\./),
   VARSYM : (/var/),
   IDENT : (/[A-Za-z]+/), //grabs unquoted string and characters
-  EQUALS : (/=/),
+  EQUALS : (/[=]/),
   COMMA : (/,/),
   SEMICOLON : (/;/),
   PRINT : (/print/),
   IFSYM : (/if/),
+  THENSYM : (/then/),
   ENDSYM : (/end/),
+  CONDEQL : (/[==]/),
+  CONDNEQL : (/!=/),
+  CONDLST : (/</),
+  CONDGRT : (/>/),
+  CONDLSE : (/<=/),
+  CONDGRE : (/>=/),
   DO : (/do/),
   WHILE : (/while/),
   FUNC : (/func/),
@@ -266,7 +273,35 @@ Parser.prototype.expr = function() {
 }
 
 Parser.prototype.condition = function() {
-
+  //**TODO : doesn't work yet
+  var left = this.expr();
+  // ==
+  if (this.accept(TOKEN_TYPES.CONDEQL)) {
+    return (left == this.expr());
+  }
+  // !=
+  else if (this.accept(TOKEN_TYPES.CONDNEQL)) {
+    return (left != this.expr());
+  }
+  // <
+  else if (this.accept(TOKEN_TYPES.CONDLST)) {
+    return (left < this.expr());
+  }
+  // >
+  else if (this.accept(TOKEN_TYPES.CONDGRT)) {
+    return (left > this.expr());
+  }
+  // <=
+  else if (this.accept(TOKEN_TYPES.CONDLSE)) {
+    return (left <= this.expr());
+  }
+  // >=
+  else if (this.accept(TOKEN_TYPES.CONDGRE)) {
+    return (left >= this.expr());
+  }
+  else {
+    //error
+  }
 }
 
 Parser.prototype.statement = function() {
@@ -318,6 +353,20 @@ Parser.prototype.statement = function() {
       this.expect(TOKEN_TYPES.SEMICOLON);
     }
   }
+  //if statement
+  //**TODO : doesn't work yet
+  else if(this.accept(TOKEN_TYPES.IFSYM)) {
+    this.expect(TOKEN_TYPES.LPAREN);
+    var result = this.condition();
+    this.expect(TOKEN_TYPES.RPAREN);
+    this.expect(TOKEN_TYPES.THENSYM);
+    if(result) {
+      this.statement();
+    }
+    this.expect(TOKEN_TYPES.ENDSYM);
+
+
+  }
   //console.log(this.varHash.get());
 }
 
@@ -332,8 +381,13 @@ Parser.prototype.block = function() {
     } while (this.accept(TOKEN_TYPES.COMMA));
     this.expect(TOKEN_TYPES.SEMICOLON);
     //accept function constructor
+    //**TODO : doesn't work yet
   } else if (this.accept(TOKEN_TYPES.FUNC)) {
-    
+    this.expect(TOKEN_TYPES.IDENT);
+    key = this.tokenizer.previous_token;
+    var funcHash = new Hash();
+    this.varHash.set(key,0);
+    this.expect(TOKEN_TYPES.SEMICOLON);
   }
   this.statement();
 }
@@ -347,6 +401,7 @@ Parser.prototype.program = function() {
       program = this.block();
     } while (!this.accept(TOKEN_TYPES.FINISHPROG));
     //console.log("finished!");
+    //console.log(this.varHash);
     return program;
   }
 }
