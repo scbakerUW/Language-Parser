@@ -67,6 +67,20 @@ print(c.key1);      /* print hash value at key */
 print("b = " + b);  /* print string concatenation */
 print(b[2]);        /* print array value at index */
 ```
+Conditional statement:
+```
+/* Currently this code only supports single 'if' statements */
+
+if (condition) then
+  (statement)
+end /* must end conditional statement with 'end' token */
+/* conditions : ==, <, >, <=, >=, != */
+
+/*example*/
+if (2 > 5) then
+  print("true");
+end
+```
 Example:
 ```
 start
