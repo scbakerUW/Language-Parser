@@ -1,9 +1,16 @@
+/* parser.js
+ * This is the main parser/interpreter for the language.
+ * This uses the concept of recursive descent parsing.
+ */
+
 Tokenizer = require('./tokenizer.js')
 Hash = require("./hash.js");
 
+//Create token type objects to use in the tokenizer and parser
 var TOKEN_TYPES = {
   STARTPROG : (/start/),
   FINISHPROG : (/finish/),
+  COMMENT: (/\/\*.*\*\//),
   NUMBER : (/\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/),
   PLUS : (/\+/),
   MINUS : (/\-/),
@@ -13,7 +20,7 @@ var TOKEN_TYPES = {
   LPAREN : (/\(/),
   RPAREN : (/\)/),
   WHITESPACE : (/(\s)/),
-  QUOTED : (/\"(.*?)\"/), //grabs quoted string
+  QUOTED : (/"((?:\\.|[^"\\])*)"/), //grabs quoted string
   LBRACKET : (/\[/),
   RBRACKET : (/\]/),
   LCURLY : (/\{/),
@@ -21,7 +28,7 @@ var TOKEN_TYPES = {
   COLON : (/\:/),
   PERIOD : (/\./),
   VARSYM : (/var/),
-  IDENT : (/[A-Za-z]+/), //grabs unquoted string and characters
+  IDENT : (/[A-Za-z0-9]+/), //grabs unquoted string and characters
   EQUALS : (/=/),
   COMMA : (/,/),
   SEMICOLON : (/;/),
@@ -34,9 +41,9 @@ var TOKEN_TYPES = {
   CONDGRT : (/>/),
   CONDLSE : (/<=/),
   CONDGRE : (/>=/),
-  DO : (/do/),
-  WHILE : (/while/),
-  FUNC : (/func/),
+  DO : (/do/),  //future functionality (not currently implemented)
+  WHILE : (/while/), //future functionality (not currently implemented)
+  FUNC : (/func/), //future functionality (not currently implemented)
 };
 
 function Parser(str) {
@@ -45,57 +52,30 @@ function Parser(str) {
 
   this.tokenizer = new Tokenizer();
 
+  // add all tokens to the tokenizer regex
   for (var key in TOKEN_TYPES) {
     this.tokenizer.add(TOKEN_TYPES[key]);
   }
-  // this.tokenizer
-  //     .add(/\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/)
-  //     .add(/\+/)
-  //     .add(/-/)
-  //     .add(/\*/)
-  //     .add(/\//)
-  //     .add(/%/)
-  //     .add(/\(/)
-  //     .add(/\)/)
-  //     .add(/(\s)/)
-  //     //.add(/(\r\n|\r|\n)/)
-  //     .add(/\"(.*?)\"/) //grabs quoted string
-  //     .add(/\[/)
-  //     .add(/\]/)
-  //     .add(/\{/)
-  //     .add(/\}/)
-  //     .add(/\:/)
-  //     .add(/\./)
-  //     .add(/start/)
-  //     .add(/end/)
-  //     .add(/finish/)
-  //     .add(/var/)
-  //     .add(/[A-Za-z]+/) //grabs unquoted string and characters
-  //     .add(/=/)
-  //     .add(/,/)
-  //     .add(/;/)
-  //     .add(/print/);
 
+  // tokenize the input str (code file)
   this.tokenizer.tokenize(str);
   this.paren_count = 0;
   this.last_pos = 0;
 
+  //create the hash object to store the variables
   this.varHash = new Hash();
 }
 
 Parser.prototype.factor = function() {
   var result;
-
+  //console.log("c = " + this.tokenizer.current() + " " + this.tokenizer.tok_pos);
   //accept(ident)
-  //console.log("current: " + this.tokenizer.current());
   if(this.varHash.keyExists(this.tokenizer.current())) {
     var key = this.tokenizer.current();
-    this.accept(TOKEN_TYPES.IDENT);///[A-Za-z]+/);
+    this.accept(TOKEN_TYPES.IDENT);
     //if ident is an array
-    //console.log(this.varHash.get(key));
-    if(this.accept(TOKEN_TYPES.LBRACKET)) { ///\[/)) {
+    if(this.accept(TOKEN_TYPES.LBRACKET)) {
       var array = this.varHash.get(key);
-      //console.log(this.tokenizer.current());
       result = array[this.tokenizer.current()];
       this.tokenizer.eat();
       this.expect(TOKEN_TYPES.RBRACKET);
@@ -113,7 +93,6 @@ Parser.prototype.factor = function() {
     //else ident is number, string, array, or hash
     else {
       var value = this.varHash.get(key);
-      //console.log("value: " + typeof(value));
       if (typeof(value) === 'number') {
         result = parseFloat(value);
       }
@@ -129,12 +108,7 @@ Parser.prototype.factor = function() {
       else {
         return null;
       }
-      // if (value.match(/\"(.*?)\"/))
-      //   result = this.varHash.get(key).replace(/\"/g, "");
-      // else
-      //   result = parseFloat(this.varHash.get(key));
     }
-    //console.log("result factor " + result);
   }
   //accept QUOTED STRING
   else if (this.accept(TOKEN_TYPES.QUOTED)) {
@@ -145,21 +119,18 @@ Parser.prototype.factor = function() {
     result = parseFloat(this.tokenizer.previous_token);
   }
   //accept LPAREN
-  else if (this.tokenizer.current().match(TOKEN_TYPES.LPAREN)) {
+  else if (this.accept(TOKEN_TYPES.LPAREN)) {
     this.last_pos = this.tokenizer.tok_pos;
     this.paren_count++;
-    this.tokenizer.eat();
-//    console.log("( encountered " + this.paren_count);
-    while(!this.tokenizer.current().match(TOKEN_TYPES.RPAREN)) {
-//      console.log("P");
+    //console.log("paren_count=" + this.paren_count);
+    do {
       if(this.tokenizer.eof()) {
         var str = "factor: syntax error missing closing ')'";
         throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
       }
       else {
-        //console.log("I'm going in...");
         result = this.expr();
-//        console.log("last_pos=" + this.last_pos + ":tok_pos=" + this.tokenizer.tok_pos);
+        //console.log("r " + result);
         if(this.last_pos == this.tokenizer.tok_pos && this.paren_count != 0) {
           var str = "factor: syntax error missing closing ')'";
           throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
@@ -168,14 +139,8 @@ Parser.prototype.factor = function() {
           this.paren_count--;
           this.last_pos = this.tokenizer.tok_pos;
         }
-//        console.log("I'm out!");
-//        console.log(this.tokenizer.tok_pos + ":" + this.tokenizer.eof());
       }
-    }
-//    console.log(") encountered " + this.paren_count);
-
-    this.tokenizer.eat();
-//    console.log("eat()... " + this.tokenizer.tok_pos + this.tokenizer.eof());
+    } while(!this.accept(TOKEN_TYPES.RPAREN));
   }
   else {
     var str = "factor: syntax error '" + this.tokenizer.current_token + "' unexpected";
@@ -186,20 +151,16 @@ Parser.prototype.factor = function() {
 
 Parser.prototype.term = function() {
   var result;
+  //console.log("term: " + this.tokenizer.current());
   result = this.factor();
-  //console.log("factor result = " + result);
-  while(this.tokenizer.current().match(/^\*$/) || this.tokenizer.current().match(/^\/$/) ||
-        this.tokenizer.current().match(/^\%$/)) {
-    if(this.tokenizer.current().match(/^\*$/)) {
-      this.tokenizer.eat();
+  while(this.tokenizer.current().match(TOKEN_TYPES.TIMES) || this.tokenizer.current().match(TOKEN_TYPES.SLASH) ||
+        this.tokenizer.current().match(TOKEN_TYPES.MOD)) {
+    if(this.accept(TOKEN_TYPES.TIMES)) {
       sub = this.factor();
-//      console.log("*sub factor result = " + sub);
       result *= sub;
     }
-    else if(this.tokenizer.current().match(/^\/$/)) {
-      this.tokenizer.eat();
+    else if(this.accept(TOKEN_TYPES.SLASH)) {
       sub = this.factor();
-//      console.log("/sub factor result = " + sub);
       if(sub != 0) {
         result /= sub;
       }
@@ -208,8 +169,7 @@ Parser.prototype.term = function() {
         throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
       }
     }
-    else if(this.tokenizer.current().match(/^\%$/)) {
-      this.tokenizer.eat();
+    else if(this.accept(TOKEN_TYPES.MOD)) {
       sub = this.factor();
       result %= sub;
     }
@@ -225,37 +185,30 @@ Parser.prototype.expr = function() {
   var sign = 1;
   var result, term;
 
-  //console.log(this.tokenizer.current());
-  // if(this.accept(/\"(.*?)\"/)) {
-  //   return this.tokenizer.previous_token.replace(/\"/g,"");
-  // }
-  if (this.accept(/^-$/)) {
-    //console.log("match - " + this.tokenizer.current());
+  //console.log("expr: " + this.tokenizer.current());
+  if (this.accept(/^\-$/)) {
     sign = -1;
+    //console.log("minus");
   }
   else if (this.accept(/^\+$/)) {
     sign = 1;
   }
+  // if result from term() is a number, apply sign
   if(typeof((term = this.term())) === 'number') {
     result = term * sign;
   }
+  // else if not a number (string)
   else {
     result = term;
   }
-  //console.log("term result = " + result);
-    while(this.tokenizer.current().match(/^\+$/) || this.tokenizer.current().match(/^-$/)) {
-      if(this.tokenizer.current().match(/^\+$/)) {
-        this.tokenizer.eat();
-        //console.log(this.tokenizer.current());
+  //console.log("re " + result);
+    while(this.tokenizer.current().match(/^\+$/) || this.tokenizer.current().match(/^\-$/)) {
+      if(this.accept(/^\+$/)) {
         term = this.term();
-        //console.log("typeof term: " + typeof(term));
         result += term;
       }
-      else if(this.tokenizer.current().match(/^-$/)) {
-        this.tokenizer.eat();
-        //console.log(this.tokenizer.current());
-        if(this.tokenizer.current().match(/^-$/)) {
-          this.tokenizer.eat();
+      else if(this.accept(/^\-$/)) {
+        if(this.accept(/^\-$/)) {
           result += this.term();
         }
         else {
@@ -267,12 +220,10 @@ Parser.prototype.expr = function() {
         throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
       }
     }
-  //console.log("term result = " + result);
   return result;
 }
 
 Parser.prototype.condition = function() {
-  //**TODO : doesn't work yet
   var left = this.expr();
   // ==
   if (this.accept(TOKEN_TYPES.EQUALS)) {
@@ -302,18 +253,17 @@ Parser.prototype.condition = function() {
   }
   else {
     //error
+    var str = "condition: syntax error '" + this.tokenizer.current() + "' unexpected";
+    throw new ParserException(str.toString(),this.tokenizer.line_number, this.tokenizer.tok_pos);
   }
 }
 
 Parser.prototype.statement = function() {
   var key;
   var printStr;
-  //console.log("statement...");
-  //console.log(this.tokenizer.current());
 
   //accept "print" keyword
   if (this.accept(TOKEN_TYPES.PRINT)) {
-    //console.log(this.tokenizer.tok_pos);
     this.print(this.expr());
     this.expect(TOKEN_TYPES.SEMICOLON);
   }
@@ -327,7 +277,6 @@ Parser.prototype.statement = function() {
         var array = [];
         do {
           array.push(this.expr());
-          //console.log(array);
         } while(this.accept(TOKEN_TYPES.COMMA));
         this.expect(TOKEN_TYPES.RBRACKET);
         var result = array;
@@ -336,10 +285,10 @@ Parser.prototype.statement = function() {
       else {
         var result = this.expr();
       }
-      //console.log(key + " = " + result);
       this.varHash.set(key, result);
       this.expect(TOKEN_TYPES.SEMICOLON);
     }
+    //accept perion token
     else if(this.accept(TOKEN_TYPES.PERIOD)) {
       var newkey = this.tokenizer.current();
       this.tokenizer.eat();
@@ -355,7 +304,6 @@ Parser.prototype.statement = function() {
     }
   }
   //if statement
-  //**TODO : doesn't work yet
   else if(this.accept(TOKEN_TYPES.IFSYM)) {
     this.expect(TOKEN_TYPES.LPAREN);
     var result = this.condition();
@@ -367,25 +315,30 @@ Parser.prototype.statement = function() {
     }
     else {
       do {
+        //if condition is the if statement is false,
+        //eat tokens until the end token is seen
         this.tokenizer.eat();
       } while (!this.accept(TOKEN_TYPES.ENDSYM));
     }
   }
-  //console.log(this.varHash.get());
+  //eat comment
+  this.accept(TOKEN_TYPES.COMMENT);
 }
 
 Parser.prototype.block = function() {
+  //accept var token
   if (this.accept(TOKEN_TYPES.VARSYM)) {
-    //console.log("var accepted");
     do {
+      //expects that a indentifer follows
       this.expect(TOKEN_TYPES.IDENT);
       key = this.tokenizer.previous_token;
-      //console.log("ident = " + key);
       this.varHash.set(key,0);
+      //accept commas for multiple declarations
     } while (this.accept(TOKEN_TYPES.COMMA));
+    // at end of declarations, expect a semicolon
     this.expect(TOKEN_TYPES.SEMICOLON);
     //accept function constructor
-    //**TODO : doesn't work yet
+    //**TODO : doesn't work yet (placeholder at the moment)
   } else if (this.accept(TOKEN_TYPES.FUNC)) {
     this.expect(TOKEN_TYPES.IDENT);
     key = this.tokenizer.previous_token;
@@ -393,6 +346,8 @@ Parser.prototype.block = function() {
     this.varHash.set(key,0);
     this.expect(TOKEN_TYPES.SEMICOLON);
   }
+  //eat comments (basically it ignores them)
+  this.accept(TOKEN_TYPES.COMMENT);
   this.statement();
 }
 
@@ -405,11 +360,11 @@ Parser.prototype.program = function() {
       program = this.block();
     } while (!this.accept(TOKEN_TYPES.FINISHPROG));
     //console.log("finished!");
-    //console.log(this.varHash);
     return program;
   }
 }
 
+//returns true and eats the current token if the regstr is equal to the current token
 Parser.prototype.accept = function(regstr) {
   if(this.tokenizer.current().match(regstr)) {
     this.tokenizer.eat();
@@ -418,6 +373,8 @@ Parser.prototype.accept = function(regstr) {
   return false;
 }
 
+//returns true and eats the current token if regstr matches current token
+//else returns false and error if unexpected token
 Parser.prototype.expect = function(regstr) {
   if(this.accept(regstr)) {
     return true;
@@ -427,13 +384,14 @@ Parser.prototype.expect = function(regstr) {
   return false;
 }
 
+//prints to screen
 Parser.prototype.print = function(message) {
   console.log(message);
 }
 
+//main parse function
 Parser.prototype.parse = function() {
   console.log(this.tokenizer.tokens);
-
   return this.program();
 }
 

@@ -1,3 +1,8 @@
+/* Custom Hash module
+ * This works similar to the native JS object arrays
+ * allows get and set controls for key: value pairs.
+ */
+
 function Hash(obj) {
 
   this.length = 0;
@@ -8,10 +13,8 @@ function Hash(obj) {
     var previous = undefined;
     if (this.keyExists(key)) {
       previous = this.items[key];
-      //console.log("key already exists");
     }
     else {
-      //console.log("key is new");
       this.length++;
     }
     this.items[key] = value;
@@ -23,12 +26,8 @@ function Hash(obj) {
       return JSON.stringify(this.items);
     }
     else {
-      //console.log("get(key,host)" + key + ":" + host);
       if(this.keyExists(key)) {
-        //cloneHash = new Hash();
         return this.items[key];
-        //return JSON.stringify(this.items[key]);
-        //console.log(cloneHash);
       }
       else {
         return "error: key data not found (key:" + key + ")";
@@ -44,7 +43,6 @@ function Hash(obj) {
     var cloneHash = (JSON.parse(JSON.stringify(this.items)));
     return cloneHash;
   }
-
 }
 
 module.exports = Hash;
