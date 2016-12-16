@@ -77,7 +77,7 @@ end /* must end conditional statement with 'end' token */
 /* conditions : ==, <, >, <=, >=, != */
 
 /*example*/
-if (2 > 5) then
+if (2 < 5) then
   print("true");
 end
 ```
