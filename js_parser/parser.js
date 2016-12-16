@@ -22,14 +22,13 @@ var TOKEN_TYPES = {
   PERIOD : (/\./),
   VARSYM : (/var/),
   IDENT : (/[A-Za-z]+/), //grabs unquoted string and characters
-  EQUALS : (/[=]/),
+  EQUALS : (/=/),
   COMMA : (/,/),
   SEMICOLON : (/;/),
   PRINT : (/print/),
   IFSYM : (/if/),
   THENSYM : (/then/),
   ENDSYM : (/end/),
-  CONDEQL : (/[==]/),
   CONDNEQL : (/!=/),
   CONDLST : (/</),
   CONDGRT : (/>/),
@@ -276,8 +275,10 @@ Parser.prototype.condition = function() {
   //**TODO : doesn't work yet
   var left = this.expr();
   // ==
-  if (this.accept(TOKEN_TYPES.CONDEQL)) {
-    return (left == this.expr());
+  if (this.accept(TOKEN_TYPES.EQUALS)) {
+    if(this.expect(TOKEN_TYPES.EQUALS)) {
+      return (left == this.expr());
+    }
   }
   // !=
   else if (this.accept(TOKEN_TYPES.CONDNEQL)) {
@@ -362,10 +363,13 @@ Parser.prototype.statement = function() {
     this.expect(TOKEN_TYPES.THENSYM);
     if(result) {
       this.statement();
+      this.expect(TOKEN_TYPES.ENDSYM);
     }
-    this.expect(TOKEN_TYPES.ENDSYM);
-
-
+    else {
+      do {
+        this.tokenizer.eat();
+      } while (!this.accept(TOKEN_TYPES.ENDSYM));
+    }
   }
   //console.log(this.varHash.get());
 }
@@ -428,7 +432,7 @@ Parser.prototype.print = function(message) {
 }
 
 Parser.prototype.parse = function() {
-  //console.log(this.tokenizer.tokens);
+  console.log(this.tokenizer.tokens);
 
   return this.program();
 }

@@ -36,5 +36,13 @@ start
     print("a == x");
   end
 
+  if(1 == 1) then
+    print("1 == 1");
+  end
+
+  if((a - x) < 5) then
+    print("(a-x) < 5");
+  end
+
   print("FINISH");
 finish
