@@ -1,0 +1,31 @@
+start
+  var x, y, z; /*comment*/
+  var str;
+  var a;
+  x = 1 + 4;
+  a = 7;
+  y = [5,6,7,8];
+
+  z.user = "name";
+  z.password = "pass1234"; /* not super secure :) */
+
+  str = "foo";
+  str = str + "foo";
+
+  print(x);
+  print(str + "bar");
+  print("Hello World");
+  print("x");
+  print("y[0] = " + y[0]);
+  print(y[1]);
+  print(y);
+  print("Number " + x);
+  print(z.user + ", " + z.password);
+  print(z);
+  print(0.5*(-1+2/3.0));
+
+  if(a > x) then
+    print("a > x");
+  end
+
+finish
